@@ -1,0 +1,107 @@
+<!--
+  Quadrotor + "H" landing pad scene.
+
+  Frames:  world Z up.  Drone body frame: X forward, Y left, Z up (X-configuration).
+  Motors:  m1 front-right (CCW), m2 back-left (CCW), m3 front-left (CW), m4 back-right (CW).
+           Each motor actuator applies thrust along +Z of its site and a reaction yaw torque
+           (sign depends on spin direction).  ctrl is thrust in Newtons in [0, max_thrust].
+  Camera:  "down_cam" is rigidly attached under the drone, looking straight down, fovy=120 deg.
+  IMU:     accelerometer + gyro at site "imu" (plus framequat / framepos / velocimeter ground truth).
+-->
+<mujoco model="drone_landing">
+  <compiler angle="degree" meshdir="." texturedir="."/>
+  <option timestep="0.002" gravity="0 0 -9.81" integrator="implicitfast"/>
+
+  <default>
+    <geom condim="3" friction="1 0.005 0.0001"/>
+    <default class="drone_geom">
+      <geom contype="1" conaffinity="1" rgba="0.15 0.15 0.15 1"/>
+    </default>
+    <default class="motor">
+      <!-- gear: fx fy fz tx ty tz in site frame. tz is the yaw reaction torque per Newton of thrust. -->
+      <motor ctrllimited="true" ctrlrange="0 4.905"/>
+    </default>
+  </default>
+
+  <asset>
+    <texture name="skybox" type="skybox" builtin="gradient" rgb1="0.6 0.75 0.95" rgb2="0.2 0.3 0.5" width="64" height="64"/>
+    <texture name="pad_tex" type="cube" file="h_pad.png"/>
+    <material name="ground_mat" rgba="0.35 0.45 0.3 1" specular="0" shininess="0"/>
+    <material name="pad_mat" texture="pad_tex" texuniform="false" specular="0" shininess="0"/>
+  </asset>
+
+  <visual>
+    <global offwidth="640" offheight="480"/>
+    <map znear="0.01" zfar="50"/>
+    <quality shadowsize="1024"/>
+  </visual>
+
+  <worldbody>
+    <!-- no cast shadows: keeps the black-H detector free of dark drone shadows on the pad -->
+    <light name="sun" pos="0 0 10" dir="0 0 -1" directional="true" castshadow="false" diffuse="0.8 0.8 0.8" ambient="0.4 0.4 0.4"/>
+
+    <geom name="ground" type="plane" size="20 20 0.1" material="ground_mat"/>
+
+    <!-- Landing pad: 1.5 m x 1.5 m, 2 cm thick, top face textured with the H.
+         Its body position is randomised by the environment at reset. -->
+    <body name="pad" pos="0 0 0">
+      <geom name="pad_geom" type="box" size="0.75 0.75 0.01" pos="0 0 0.01" material="pad_mat"/>
+      <site name="pad_center" pos="0 0 0.02" size="0.01" rgba="0 0 0 0"/>
+    </body>
+
+    <!-- Quadrotor -->
+    <body name="drone" pos="0 0 3">
+      <freejoint name="drone_free"/>
+      <!-- external chase camera that follows the drone (for viewing / video) -->
+      <camera name="chase" mode="trackcom" pos="-2 -2 2" xyaxes="1 -1 0 2 2 4"/>
+      <inertial pos="0 0 0" mass="1.0" diaginertia="0.0082 0.0082 0.0149"/>
+
+      <geom name="core" class="drone_geom" type="box" size="0.06 0.06 0.02"/>
+      <!-- arms (X configuration, 0.15 m from centre to motor) -->
+      <geom name="arm1" class="drone_geom" type="capsule" fromto="0 0 0  0.106 -0.106 0" size="0.008"/>
+      <geom name="arm2" class="drone_geom" type="capsule" fromto="0 0 0 -0.106  0.106 0" size="0.008"/>
+      <geom name="arm3" class="drone_geom" type="capsule" fromto="0 0 0  0.106  0.106 0" size="0.008"/>
+      <geom name="arm4" class="drone_geom" type="capsule" fromto="0 0 0 -0.106 -0.106 0" size="0.008"/>
+      <!-- rotors (visual only) -->
+      <geom name="rotor1" type="cylinder" size="0.06 0.003" pos=" 0.106 -0.106 0.02" rgba="0.9 0.2 0.2 0.6" contype="0" conaffinity="0" mass="0"/>
+      <geom name="rotor2" type="cylinder" size="0.06 0.003" pos="-0.106  0.106 0.02" rgba="0.2 0.2 0.9 0.6" contype="0" conaffinity="0" mass="0"/>
+      <geom name="rotor3" type="cylinder" size="0.06 0.003" pos=" 0.106  0.106 0.02" rgba="0.9 0.2 0.2 0.6" contype="0" conaffinity="0" mass="0"/>
+      <geom name="rotor4" type="cylinder" size="0.06 0.003" pos="-0.106 -0.106 0.02" rgba="0.2 0.2 0.9 0.6" contype="0" conaffinity="0" mass="0"/>
+      <!-- landing legs: bottom at z = -0.08 -->
+      <geom name="leg1" class="drone_geom" type="capsule" fromto=" 0.05 -0.05 -0.02  0.07 -0.07 -0.08" size="0.006"/>
+      <geom name="leg2" class="drone_geom" type="capsule" fromto="-0.05  0.05 -0.02 -0.07  0.07 -0.08" size="0.006"/>
+      <geom name="leg3" class="drone_geom" type="capsule" fromto=" 0.05  0.05 -0.02  0.07  0.07 -0.08" size="0.006"/>
+      <geom name="leg4" class="drone_geom" type="capsule" fromto="-0.05 -0.05 -0.02 -0.07 -0.07 -0.08" size="0.006"/>
+
+      <!-- thrust sites -->
+      <site name="thrust1" pos=" 0.106 -0.106 0.02" size="0.005" rgba="1 0 0 0"/>
+      <site name="thrust2" pos="-0.106  0.106 0.02" size="0.005" rgba="1 0 0 0"/>
+      <site name="thrust3" pos=" 0.106  0.106 0.02" size="0.005" rgba="1 0 0 0"/>
+      <site name="thrust4" pos="-0.106 -0.106 0.02" size="0.005" rgba="1 0 0 0"/>
+
+      <!-- IMU site at the body centre -->
+      <site name="imu" pos="0 0 0" size="0.005" rgba="0 1 0 0"/>
+
+      <!-- Downward wide-angle camera, mounted under the core.
+           MuJoCo cameras look along their -Z axis; this quat rotates the camera so -Z_cam = -Z_body (down)
+           and +Y_cam (image up) = +X_body (forward). -->
+      <camera name="down_cam" pos="0 0 -0.07" quat="1 0 0 0" fovy="120"/>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <!-- CCW pair: positive reaction torque; CW pair: negative -->
+    <motor name="m1" class="motor" site="thrust1" gear="0 0 1 0 0  0.02"/>
+    <motor name="m2" class="motor" site="thrust2" gear="0 0 1 0 0  0.02"/>
+    <motor name="m3" class="motor" site="thrust3" gear="0 0 1 0 0 -0.02"/>
+    <motor name="m4" class="motor" site="thrust4" gear="0 0 1 0 0 -0.02"/>
+  </actuator>
+
+  <sensor>
+    <accelerometer name="imu_acc" site="imu"/>
+    <gyro name="imu_gyro" site="imu"/>
+    <framequat name="drone_quat" objtype="body" objname="drone"/>
+    <framepos name="drone_pos" objtype="body" objname="drone"/>
+    <velocimeter name="drone_vel" site="imu"/>
+  </sensor>
+</mujoco>
