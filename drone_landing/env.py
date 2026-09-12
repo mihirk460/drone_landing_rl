@@ -103,7 +103,7 @@ class DroneLandingEnv(gym.Env):
 
         if self.cfg.vision_mode == "camera":
             self._last_frame = self._render_onboard()
-            det = find_h_centroid(self._last_frame, self.cfg.dark_threshold, self.cfg.min_blob_pixels)
+            det = find_h_centroid(self._last_frame, self.cfg.min_blob_pixels)
             uv = None if det is None else det[:2]
         elif self.cfg.vision_mode == "ground_truth":
             uv = ground_to_pixel(self.pad_center, cam_pos, cam_mat, fovy, aspect)

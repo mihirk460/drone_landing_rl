@@ -5,17 +5,18 @@ import cv2
 import numpy as np
 
 
-def find_h_centroid(rgb: np.ndarray, dark_threshold: int = 60, min_pixels: int = 3):
-    """Locate the black H on the white pad.
+def find_h_centroid(rgb: np.ndarray, min_pixels: int = 3):
+    """Locate the yellow H on the dark pad.
 
-    The H is the only near-black thing in the scene (ground is green, pad is white,
-    the drone itself is out of the camera's view), so a threshold + largest blob is enough.
+    The H is the only yellow thing in the scene (ground is green, pad is dark grey,
+    the drone itself is out of the camera's view), so a colour threshold + largest blob is enough.
 
     Returns (u, v, pixel_count) with u, v in [-1, 1] normalised image coordinates
     (u right, v up, (0,0) = image centre), or None if nothing is found.
     """
     h, w = rgb.shape[:2]
-    mask = (rgb.max(axis=2) < dark_threshold).astype(np.uint8)
+    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    mask = ((r > 150) & (g > 150) & (b < 100)).astype(np.uint8)   # "yellow" = strong red + green, weak blue
     n, labels, stats, centroids = cv2.connectedComponentsWithStats(mask, connectivity=8)
     if n <= 1:
         return None

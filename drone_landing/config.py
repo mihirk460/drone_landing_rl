@@ -28,7 +28,6 @@ class EnvConfig:
     # "ground_truth": skip rendering, project the true pad centre through the same
     #                 camera model. Same observation layout; ~10x faster; no OpenGL needed.
     vision_mode: str = "camera"
-    dark_threshold: int = 80        # pixel value below which a pixel counts as "black H"
     min_blob_pixels: int = 3        # smaller detections are treated as "pad not visible"
 
     # ---- episode start ----
@@ -49,32 +48,39 @@ class EnvConfig:
 
 @dataclass
 class RewardConfig:
-    """Per-step reward = sum of weighted terms; terminal bonuses added on episode end.
+    """Reward = sum of per-step terms, plus one terminal bonus when the episode ends.
 
-    Per-step terms (all <= 0 except progress):
-        progress : (previous 3D distance to pad - current distance)  -> positive when approaching
-        xy       : -horizontal distance to pad centre
-        z        : -height above pad
-        vel      : -speed
-        tilt     : -tilt angle (rad)
-        action   : -mean(action^2)  (0 == hover, so this penalises aggressive throttle)
-        lost     : -1 when the pad is not visible in the camera
-    Terminal:
-        landed   : +R_landed * softness  (softness in [0.5, 1], higher for slower touchdown)
-        crashed  : R_crashed
-        oob      : R_out_of_bounds
+    Per-step terms (50 per second, episode is at most 600 steps):
+        progress : +w_progress * (previous 3D distance to pad - current distance)  (positive when approaching)
+        xy       : -w_xy      * horizontal distance to pad centre [m]
+        z        : -w_z       * height above pad [m]
+        vel      : -w_vel     * speed [m/s]
+        tilt     : -w_tilt    * tilt angle [rad]
+        action   : -w_action  * mean(action^2)   (action 0 == hover, so this penalises aggressive throttle)
+        lost     : -w_lost    * (1 if the pad is not visible in the camera else 0)
+    Terminal bonus:
+        landed        : +R_landed * softness, softness = 1.0 for a very gentle touchdown, 0.5 at the speed limit
+        crashed       : R_crashed
+        out_of_bounds : R_out_of_bounds
+        timeout       : 0
+
+    Balance (important, do not break it when tuning):
+        hovering in place for the whole episode costs about -30 to -60 in step terms;
+        crashing costs -100 plus the steps so far; landing earns +100 to +200.
+        So: land > hover > crash. If step penalties grow much larger than the crash
+        penalty, the agent learns to crash early to stop paying them.
     """
-    w_progress: float = 1.0
-    w_xy: float = 0.10
-    w_z: float = 0.03
-    w_vel: float = 0.01
-    w_tilt: float = 0.05
-    w_action: float = 0.002
-    w_lost: float = 0.10
+    w_progress: float = 5.0
+    w_xy: float = 0.02
+    w_z: float = 0.01
+    w_vel: float = 0.005
+    w_tilt: float = 0.02
+    w_action: float = 0.001
+    w_lost: float = 0.05
 
-    R_landed: float = 100.0
-    R_crashed: float = -50.0
-    R_out_of_bounds: float = -50.0
+    R_landed: float = 200.0
+    R_crashed: float = -100.0
+    R_out_of_bounds: float = -100.0
 
 
 @dataclass
