@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+logs/
+outputs/
+# checkpoints are large and frequent; final weights (models/<run>/final_model.zip) may be committed
+models/*/checkpoints/
+models/*/eval/
